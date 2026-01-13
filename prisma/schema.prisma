@@ -1,0 +1,236 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // ⚠️ IMPORTANT: Use `prisma db push` instead of `prisma migrate dev`
+  // 
+  // The pgvector extension is not available in Prisma's shadow database.
+  // Running `prisma migrate dev` will fail with:
+  //   "ERROR: extension 'pgvector' is not available"
+  //
+  // Solution: Always use `npm run db:push` for schema changes.
+  // See FIX_PRISMA_MIGRATION.md if you encounter migration errors.
+}
+
+model User {
+  id        String   @id // Supabase auth user ID
+  email     String   @unique
+  fullName  String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  projects       Project[]
+  mcpConnections MCPConnection[]
+
+  @@map("users")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  repoUrl     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  complianceAssessments ComplianceAssessment[]
+  findings              Finding[]
+  agentRuns             AgentRun[]
+  ComplianceReport      ComplianceReport[]
+
+  @@map("projects")
+}
+
+model ComplianceFramework {
+  id          String   @id @default(cuid())
+  name        String // SOC2, GDPR, HIPAA, etc.
+  version     String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  requirements ComplianceRequirement[]
+  assessments  ComplianceAssessment[]
+
+  @@unique([name, version])
+  @@map("compliance_frameworks")
+}
+
+model ComplianceRequirement {
+  id          String   @id @default(cuid())
+  frameworkId String
+  code        String // e.g., "CC6.1", "GDPR-Art32"
+  title       String
+  description String
+  category    String // e.g., "Access Control", "Data Protection"
+  createdAt   DateTime @default(now())
+
+  // Relations
+  framework ComplianceFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  findings  Finding[]
+
+  @@unique([frameworkId, code])
+  @@map("compliance_requirements")
+}
+
+model ComplianceAssessment {
+  id          String    @id @default(cuid())
+  projectId   String
+  frameworkId String
+  score       Float     @default(0) // 0-100
+  status      String // "pending", "in_progress", "completed", "failed"
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  // Relations
+  project   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  framework ComplianceFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  findings  Finding[]
+
+  @@map("compliance_assessments")
+}
+
+model Finding {
+  id            String    @id @default(cuid())
+  projectId     String
+  assessmentId  String?
+  requirementId String?
+  severity      String // "critical", "high", "medium", "low"
+  title         String
+  description   String
+  status        String    @default("open") // "open", "in_progress", "resolved", "dismissed"
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  resolvedAt    DateTime?
+
+  // Relations
+  project     Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assessment  ComplianceAssessment?  @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  requirement ComplianceRequirement? @relation(fields: [requirementId], references: [id], onDelete: SetNull)
+  evidence    Evidence[]
+  remediation RemediationTask?
+
+  @@map("findings")
+}
+
+model Evidence {
+  id         String   @id @default(cuid())
+  findingId  String
+  type       String // "code", "documentation", "config", "log"
+  source     String // "github", "notion", "aws", "gcp"
+  filePath   String?
+  lineNumber Int?
+  content    String // The actual code snippet or text
+  url        String?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  finding Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  @@map("evidence")
+}
+
+model RemediationTask {
+  id          String   @id @default(cuid())
+  findingId   String   @unique
+  title       String
+  description String
+  priority    String // "critical", "high", "medium", "low"
+  status      String   @default("pending") // "pending", "in_progress", "completed"
+  externalId  String? // Jira/Linear ticket ID
+  externalUrl String? // Link to external ticket
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  finding Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  @@map("remediation_tasks")
+}
+
+model AgentRun {
+  id          String    @id @default(cuid())
+  projectId   String
+  agentType   String // "intake", "regulation_rag", "gap_analysis", "action_planner", "reporting"
+  status      String // "pending", "running", "completed", "failed"
+  input       Json?
+  output      Json?
+  error       String?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  // Relations
+  project          Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  toolCalls        MCPToolCall[]
+  ComplianceReport ComplianceReport[]
+
+  @@map("agent_runs")
+}
+
+model MCPToolCall {
+  id         String   @id @default(cuid())
+  agentRunId String?
+  toolName   String
+  parameters Json
+  result     Json?
+  status     String // "pending", "success", "error"
+  error      String?
+  duration   Int? // milliseconds
+  createdAt  DateTime @default(now())
+
+  // Relations
+  agentRun AgentRun? @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+
+  @@map("mcp_tool_calls")
+}
+
+model MCPConnection {
+  id          String   @id @default(cuid())
+  userId      String
+  serverName  String
+  authType    String // "oauth", "api_key", "api_token", "env"
+  credentials Json // Encrypted credentials
+  projectId   String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, serverName])
+  @@map("mcp_connections")
+}
+
+model ComplianceReport {
+  id            String   @id @default(cuid())
+  projectId     String
+  agentRunId    String?
+  framework     String // SOC2, GDPR, HIPAA, ISO, PCI
+  reportData    Json // Full report JSON
+  storageUrl    String? // Supabase Storage URL if saved to storage
+  score         Float? // Overall compliance score (0-100)
+  findingsCount Int      @default(0)
+  status        String   @default("completed") // "completed", "failed", "partial"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agentRun AgentRun? @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([framework])
+  @@map("compliance_reports")
+}

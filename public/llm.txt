@@ -1,0 +1,46 @@
+# Compliance Copilot - AI-Powered Compliance Assessment Platform
+
+## Overview
+Compliance Copilot is an AI-powered platform that automates compliance assessments for SOC2, GDPR, HIPAA, ISO, and PCI frameworks. It uses Model Context Protocol (MCP) to connect with cloud services, code repositories, and monitoring tools to perform comprehensive compliance audits.
+
+## Key Features
+- **Multi-Framework Support**: SOC2, GDPR, HIPAA, ISO 27001, PCI DSS
+- **Intelligent Scanning**: AI agents scan codebases, cloud infrastructure, and monitoring tools
+- **Automated Gap Analysis**: Identifies compliance gaps and generates remediation plans
+- **Professional Reports**: Auditor-style reports with findings, evidence, and recommendations
+- **MCP Integration**: Connects to GitHub, AWS, Azure, Cloudflare, Google Cloud, and more
+
+## Architecture
+- **Frontend**: Next.js 14+ with React, TypeScript, Tailwind CSS
+- **Backend**: Next.js API Routes, Prisma ORM, Supabase
+- **AI Agents**: LangChain, LangGraph for multi-agent orchestration
+- **MCP Servers**: Model Context Protocol for service integration
+- **Storage**: Supabase (PostgreSQL + Storage), Redis (Mem0) for agent memory
+- **Vector Store**: Supabase pgvector for RAG (Retrieval-Augmented Generation)
+
+## API Endpoints
+- `/api/swarm/run` - Start compliance analysis
+- `/api/swarm/stream` - Real-time progress updates (SSE)
+- `/api/swarm/report` - Get analysis report
+- `/api/mcp/connections` - Manage MCP server connections
+- `/api/reports` - Compliance reports management
+- `/api/findings` - Compliance findings
+- `/api/dashboard/stats` - Dashboard statistics
+
+## Required Connections
+- **GitHub**: Required for codebase analysis
+- **Cloud Service**: At least one of AWS, Azure, Cloudflare, or Google Cloud
+
+## Deployment
+- **Platform**: Vercel (recommended)
+- **Database**: Supabase PostgreSQL
+- **Storage**: Supabase Storage for reports
+- **Redis**: Required for agent memory (Mem0)
+
+## Documentation
+- MCP Connection Guide: `/docs/MCP_CONNECTION_GUIDE`
+- Agent Swarm Documentation: `/docs/AGENT_SWARM.md`
+- Web Research Documentation: `/docs/AGENT_WEB_RESEARCH.md`
+
+## Contact
+For support and questions, visit the dashboard at `/dashboard`

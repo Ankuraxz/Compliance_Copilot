@@ -1,0 +1,7 @@
+# Prisma Configuration
+# This file helps Prisma work with Supabase and pgvector
+
+# Skip shadow database validation for Supabase
+# The pgvector extension is not available in Prisma's shadow database
+# Use `prisma db push` instead of `prisma migrate dev`
+
