@@ -31,17 +31,16 @@ This guide covers deploying Compliance Copilot to Vercel with all required servi
    - Create a new project
    - Note your project URL and anon key
 
-2. **Run Database Migrations**
+2. **Run Database Schema Push**
    ```bash
-   # Install Prisma CLI if not already installed
-   npm install -g prisma
-   
    # Set DATABASE_URL in your environment
    export DATABASE_URL="postgresql://postgres:[password]@[host]:5432/postgres"
    
-   # Run migrations
-   npx prisma migrate deploy
+   # Push schema (Prisma is installed as dependency, no need to install globally)
+   npx prisma db push
    ```
+   
+   **Note**: For Supabase with pgvector, use `db:push` instead of `migrate`. The Prisma CLI is included in dependencies for Vercel builds.
 
 3. **Enable pgvector Extension**
    ```sql
@@ -133,6 +132,8 @@ NEXT_PUBLIC_GA_ID=[google-analytics-id]
    - Build Command: `npm run build` (or `next build`)
    - Output Directory: `.next`
    - Install Command: `npm install`
+   
+   **Important**: Prisma CLI is included in `dependencies` (not `devDependencies`) to ensure `prisma generate` runs during the Vercel build process. The `postinstall` script automatically generates the Prisma Client after installation.
 
 3. **Set Environment Variables**
    - Go to Vercel Dashboard → Project → Settings → Environment Variables
@@ -232,6 +233,8 @@ NEXT_PUBLIC_GA_ID=[google-analytics-id]
 **Solution:**
 - Check Node.js version (should be 18+)
 - Verify all dependencies are in `package.json`
+- **Prisma CLI Error**: Ensure `prisma` is in `dependencies` (not `devDependencies`) for Vercel builds
+- The `postinstall` script runs `prisma generate` - Prisma CLI must be available
 - Check for TypeScript errors: `npm run type-check`
 - Review Vercel build logs
 
