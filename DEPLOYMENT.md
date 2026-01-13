@@ -237,9 +237,11 @@ NEXT_PUBLIC_GA_ID=[google-analytics-id]
 - Check Node.js version (should be 18+)
 - Verify all dependencies are in `package.json`
 - **Prisma CLI Error**: Ensure `prisma` is in `dependencies` (not `devDependencies`) for Vercel builds
+- **TypeScript Error**: Ensure `typescript`, `@types/node`, `@types/react`, and `@types/react-dom` are in `dependencies` (not `devDependencies`) - Next.js needs them during build
 - The `postinstall` script runs `prisma generate` - Prisma CLI must be available
 - Check for TypeScript errors: `npm run type-check`
 - Review Vercel build logs
+- **Routes Manifest Error**: Usually resolves after fixing TypeScript/Prisma issues - ensure build completes successfully
 
 ### Issue: Module Not Found Errors (MCP SDK)
 **Solution:**
