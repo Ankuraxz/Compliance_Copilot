@@ -18,7 +18,7 @@ import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { CardSkeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { 
-  Play, Loader2, Shield, TrendingUp, AlertTriangle, Plus, FileText, Calendar
+  Play, Loader2, Shield, TrendingUp, AlertTriangle, Plus, FileText, Calendar, Download
 } from 'lucide-react';
 
 interface Project {
@@ -759,16 +759,78 @@ export default function DashboardPage() {
                           <div className="text-sm">
                             <span className="font-semibold">{report.findingsCount}</span> findings
                           </div>
-                          {report.storageUrl && (
+                          <div className="flex gap-2 flex-wrap">
+                            {report.storageUrl && (
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                color="primary"
+                                onPress={() => window.open(report.storageUrl, '_blank')}
+                              >
+                                View Full Report
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="flat"
-                              color="primary"
-                              onPress={() => window.open(report.storageUrl, '_blank')}
+                              color="default"
+                              onPress={async () => {
+                                try {
+                                  const response = await fetch(`/api/reports/${report.id}/download?format=md`);
+                                  if (response.ok) {
+                                    const blob = await response.blob();
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `${report.framework}-compliance-report-${report.id}.md`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                    showToast('Report downloaded successfully', 'success');
+                                  } else {
+                                    showToast('Failed to download report', 'error');
+                                  }
+                                } catch (error) {
+                                  console.error('Download error:', error);
+                                  showToast('Failed to download report', 'error');
+                                }
+                              }}
+                              startContent={<Download className="w-4 h-4" />}
                             >
-                              View Full Report
+                              Download MD
                             </Button>
-                          )}
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              color="default"
+                              onPress={async () => {
+                                try {
+                                  const response = await fetch(`/api/reports/${report.id}/download?format=json`);
+                                  if (response.ok) {
+                                    const blob = await response.blob();
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `${report.framework}-compliance-report-${report.id}.json`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                    showToast('Report downloaded successfully', 'success');
+                                  } else {
+                                    showToast('Failed to download report', 'error');
+                                  }
+                                } catch (error) {
+                                  console.error('Download error:', error);
+                                  showToast('Failed to download report', 'error');
+                                }
+                              }}
+                              startContent={<Download className="w-4 h-4" />}
+                            >
+                              Download JSON
+                            </Button>
+                          </div>
                         </div>
                       </CardBody>
                     </Card>

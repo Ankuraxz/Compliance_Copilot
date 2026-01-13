@@ -133,8 +133,16 @@ export class ReportingAgent {
       return {
         data: {
           ...state.data,
-          report: {
-            ...report!,
+          report: report ? {
+            ...report,
+            summary,
+            recommendations,
+          } : {
+            framework,
+            overallScore: 0,
+            categoryScores: {},
+            totalFindings: 0,
+            findingsBySeverity: {},
             summary,
             recommendations,
           },

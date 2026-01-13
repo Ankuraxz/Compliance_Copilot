@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
           description: task.description,
           priority: task.priority,
           labels: ['compliance', task.finding.requirement?.code || ''],
-        });
+        }, user.id);
 
         // Update task with external ticket info
         await prisma.remediationTask.update({

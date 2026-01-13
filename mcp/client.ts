@@ -364,11 +364,12 @@ output = json
                   // Setting to 'false' prevents boto3 from reading our files
                   env.AWS_SDK_LOAD_CONFIG = 'true';
                   
-                  // CRITICAL: Explicitly set AWS credentials file location
-                  // This ensures boto3 uses our file and not ~/.aws/credentials
-                  process.env.AWS_SHARED_CREDENTIALS_FILE = credentialsFile;
-                  process.env.AWS_CONFIG_FILE = configFile;
-                  process.env.AWS_PROFILE = 'default';
+                  // CRITICAL: Explicitly set AWS credentials file location in env object only
+                  // DO NOT modify global process.env - this would affect other users' connections
+                  // These values are only set in the subprocess environment
+                  env.AWS_SHARED_CREDENTIALS_FILE = credentialsFile;
+                  env.AWS_CONFIG_FILE = configFile;
+                  env.AWS_PROFILE = 'default';
                   
                   // Verify files exist and are readable
                   if (!fs.existsSync(credentialsFile) || !fs.existsSync(configFile)) {
@@ -589,6 +590,11 @@ output = json
         throw new Error(`${config.type} transport requires URL for server ${serverName}`);
       }
       
+      // Capture userId and clientKey for use in callbacks
+      // Extract userId from credentials (credentials type in _doConnect doesn't include userId, but it may be present)
+      const sseUserId = (credentials as any)?.userId || 'anonymous';
+      const sseClientKey = `${sseUserId}:${serverName}`;
+      
       try {
         // Polyfill EventSource for Node.js (SSEClientTransport requires it)
         // EventSource is a browser API, so we need a Node.js-compatible implementation
@@ -666,7 +672,7 @@ output = json
           if (typeof credentials === 'string') {
             token = credentials;
           } else if (credentials) {
-            token = credentials.accessToken || credentials.apiToken || credentials.token || credentials.apiKey;
+            token = credentials.accessToken || credentials.apiToken || credentials.apiKey;
           }
           if (!token) {
             token = config.apiToken || config.apiKey;
@@ -685,17 +691,19 @@ output = json
         
         // Add error handlers for SSE transport to handle disconnections gracefully
         // The transport may have an EventSource that can disconnect
-        if (transport && typeof transport.on === 'function') {
-          transport.on('error', (error: any) => {
+        // Use userId from the top of the function (already extracted from credentials)
+        if (transport && 'on' in transport && typeof (transport as any).on === 'function') {
+          (transport as any).on('error', (error: any) => {
             console.warn(`[${serverName}] SSE transport error:`, error?.message || error?.toString() || 'Unknown error');
             // Don't throw - let the connection attempt continue
           });
           
-          transport.on('close', () => {
+          (transport as any).on('close', () => {
             console.warn(`[${serverName}] SSE transport closed - connection may have been terminated`);
             // Remove client from map if connection is closed
-            if (this.clients.has(serverName)) {
-              this.clients.delete(serverName);
+            // Use captured clientKey from function scope
+            if (this.clients.has(sseClientKey)) {
+              this.clients.delete(sseClientKey);
             }
           });
         }
