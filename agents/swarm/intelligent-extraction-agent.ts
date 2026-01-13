@@ -61,13 +61,15 @@ export class IntelligentExtractionAgent {
   private framework: string;
   private projectId: string;
   private sessionId: string;
+  private userId: string; // CRITICAL: User ID for MCP client isolation
   private config: ScanConfiguration;
 
   constructor(
     projectId: string, 
     sessionId: string, 
     framework: string,
-    config?: ScanConfiguration
+    config?: ScanConfiguration,
+    userId?: string // CRITICAL: User ID for multi-user isolation
   ) {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -77,6 +79,7 @@ export class IntelligentExtractionAgent {
     this.framework = framework;
     this.projectId = projectId;
     this.sessionId = sessionId;
+    this.userId = userId || sessionId; // Use userId if provided, fallback to sessionId
     // Default configuration - allows for hours of runtime
     this.config = {
       maxToolCallsPerServer: config?.maxToolCallsPerServer ?? 0, // 0 = unlimited
@@ -619,7 +622,7 @@ export class IntelligentExtractionAgent {
       let retries = 3;
       while (retries > 0) {
         try {
-          client = await mcpClientManager.connect(serverName, formattedCredentials);
+          client = await mcpClientManager.connect(serverName, { ...formattedCredentials, userId: this.userId });
           break;
         } catch (connectError: any) {
           retries--;
@@ -637,7 +640,7 @@ export class IntelligentExtractionAgent {
       while (listRetries > 0) {
         try {
           tools = await Promise.race([
-            mcpClientManager.listTools(serverName),
+            mcpClientManager.listTools(serverName, this.userId),
             new Promise((_, reject) => 
               setTimeout(() => reject(new Error('Tool listing timeout')), 20000)
             )
@@ -652,7 +655,7 @@ export class IntelligentExtractionAgent {
           // Reconnect if connection was closed
           if (listError.message?.includes('closed') || listError.message?.includes('not connected')) {
             try {
-              await mcpClientManager.connect(serverName, formattedCredentials);
+              await mcpClientManager.connect(serverName, { ...formattedCredentials, userId: this.userId });
             } catch (reconnectError) {
               console.error(`[${serverName}] Reconnection failed:`, reconnectError);
             }
@@ -1240,7 +1243,7 @@ Return JSON:
       
       while (retries > 0) {
         try {
-          toolResult = await mcpClientManager.callTool(serverName, toolName, scanTask.parameters || {});
+          toolResult = await mcpClientManager.callTool(serverName, toolName, scanTask.parameters || {}, this.userId);
           break; // Success
         } catch (error: any) {
           // Handle AWS CloudWatch specific errors gracefully
@@ -1832,8 +1835,8 @@ Return JSON array (can have multiple results):
       };
 
       try {
-        await mcpClientManager.connect('cloudflare-container', containerCredentials);
-        const tools = await mcpClientManager.listTools('cloudflare-container');
+        await mcpClientManager.connect('cloudflare-container', { ...containerCredentials, userId: this.userId });
+        const tools = await mcpClientManager.listTools('cloudflare-container', this.userId);
         
         if (!tools || tools.length === 0) {
           console.warn('[Cloudflare Container] No tools available');
@@ -1909,7 +1912,7 @@ print(json.dumps({"findings": findings, "framework": "${this.framework}"}))
           const result = await mcpClientManager.callTool('cloudflare-container', toolName, {
             script: analysisScript,
             language: 'python',
-          });
+          }, this.userId);
 
           const containerResult = this.parseToolResult(result);
           

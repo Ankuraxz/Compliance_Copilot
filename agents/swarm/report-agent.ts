@@ -140,10 +140,10 @@ export class ReportGenerationAgent {
       // LAYER 2: Generate report sections with fallback and timeout
       let sections: ReportSection[] = [];
       try {
-        // Add timeout to section generation (45 seconds - increased from 30)
+        // Add timeout to section generation (60 seconds - increased to prevent timeouts)
         const sectionsPromise = this.generateSections(swarmState, context);
         const sectionsTimeout = new Promise<ReportSection[]>((_, reject) => {
-          setTimeout(() => reject(new Error('Sections generation timeout')), 45000); // Increased to 45 seconds
+          setTimeout(() => reject(new Error('Sections generation timeout')), 60000); // Increased to 60 seconds
         });
         
         sections = await Promise.race([sectionsPromise, sectionsTimeout]);
@@ -272,7 +272,7 @@ export class ReportGenerationAgent {
           effectiveRemediationPlan
         );
         const summaryTimeout = new Promise<string>((_, reject) => {
-          setTimeout(() => reject(new Error('Executive summary generation timeout')), 30000); // Increased to 30 seconds
+          setTimeout(() => reject(new Error('Executive summary generation timeout')), 40000); // Increased to 40 seconds
         });
         
         executiveSummary = await Promise.race([summaryPromise, summaryTimeout]);
@@ -412,23 +412,23 @@ Return JSON: {"sections": [{"title": "...", "content": "...", "evidence": [{"sou
     try {
       const model = process.env.OPENAI_CHAT_MODEL || 'gpt-4o';
       
-      // Add timeout to LLM call (40 seconds - increased from 25)
-      const llmPromise = this.openai.chat.completions.create({
-        model,
-        messages: [
-          {
-            role: 'system',
-            content: CYBERSECURITY_SYSTEM_PROMPTS.reporting,
-          },
-          { role: 'user', content: prompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 1,
-      });
-      
-      const llmTimeout = new Promise<any>((_, reject) => {
-        setTimeout(() => reject(new Error('LLM call timeout')), 40000); // Increased to 40 seconds
-      });
+            // Add timeout to LLM call (50 seconds - increased to prevent timeouts)
+            const llmPromise = this.openai.chat.completions.create({
+              model,
+              messages: [
+                {
+                  role: 'system',
+                  content: CYBERSECURITY_SYSTEM_PROMPTS.reporting,
+                },
+                { role: 'user', content: prompt },
+              ],
+              response_format: { type: 'json_object' },
+              temperature: 1,
+            });
+            
+            const llmTimeout = new Promise<any>((_, reject) => {
+              setTimeout(() => reject(new Error('LLM call timeout')), 50000); // Increased to 50 seconds
+            });
 
       const response = await Promise.race([llmPromise, llmTimeout]);
       const content = response.choices[0]?.message?.content;
@@ -464,9 +464,9 @@ Return JSON: {"sections": [{"title": "...", "content": "...", "evidence": [{"sou
       }
       
       // Final validation: ensure sections have required fields
-      sections = sections.filter(section => 
-        section && 
-        typeof section.title === 'string' && 
+      sections = sections.filter((section: any) =>
+        section &&
+        typeof section.title === 'string' &&
         section.title.trim().length > 0 &&
         typeof section.content === 'string'
       );
@@ -632,15 +632,16 @@ Return JSON: {"sections": [{"title": "...", "content": "...", "evidence": [{"sou
     }
 
     // Generate findings from evidence (only if not already covered)
-    // OPTIMIZATION: Limit evidence analysis to prevent timeout (max 12 items, 10 seconds each)
-    const evidenceToAnalyze = allEvidence.slice(0, 12); // Reduced from 15 to 12 to allow more time per item
+        // OPTIMIZATION: Limit evidence analysis to prevent timeout (max 8 items, 15 seconds each)
+        // Further reduced to prevent cascading timeouts
+        const evidenceToAnalyze = allEvidence.slice(0, 8); // Reduced from 12 to 8 to prevent timeout cascades
     const evidencePromises = evidenceToAnalyze.map(async (evidence) => {
-      try {
-        // Add timeout to each evidence analysis (10 seconds - increased from 8)
-        const analysisPromise = this.analyzeEvidence(evidence, swarmState.framework);
-        const analysisTimeout = new Promise<Omit<DetailedReport['findings'][0], 'evidence'> | null>((_, reject) => {
-          setTimeout(() => reject(new Error('Evidence analysis timeout')), 10000); // Increased to 10 seconds
-        });
+            try {
+              // Add timeout to each evidence analysis (15 seconds - increased to prevent timeouts)
+              const analysisPromise = this.analyzeEvidence(evidence, swarmState.framework);
+              const analysisTimeout = new Promise<Omit<DetailedReport['findings'][0], 'evidence'> | null>((_, reject) => {
+                setTimeout(() => reject(new Error('Evidence analysis timeout')), 15000); // Increased to 15 seconds
+              });
         
         const finding = await Promise.race([analysisPromise, analysisTimeout]);
         if (finding && !existingTitles.has(finding.title.toLowerCase())) {
@@ -801,23 +802,23 @@ If no gap, return null.`;
     try {
       const model = process.env.OPENAI_CHAT_MODEL || 'gpt-4o';
       
-      // Add timeout to LLM call (10 seconds per evidence item - increased from 8)
-      const llmPromise = this.openai.chat.completions.create({
-        model,
-        messages: [
-          {
-            role: 'system',
-            content: CYBERSECURITY_SYSTEM_PROMPTS.gapAnalysis,
-          },
-          { role: 'user', content: prompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 1,
-      });
-      
-      const llmTimeout = new Promise<any>((_, reject) => {
-        setTimeout(() => reject(new Error('Evidence analysis LLM timeout')), 10000); // Increased to 10 seconds
-      });
+            // Add timeout to LLM call (15 seconds per evidence item - increased to prevent timeouts)
+            const llmPromise = this.openai.chat.completions.create({
+              model,
+              messages: [
+                {
+                  role: 'system',
+                  content: CYBERSECURITY_SYSTEM_PROMPTS.gapAnalysis,
+                },
+                { role: 'user', content: prompt },
+              ],
+              response_format: { type: 'json_object' },
+              temperature: 1,
+            });
+            
+            const llmTimeout = new Promise<any>((_, reject) => {
+              setTimeout(() => reject(new Error('Evidence analysis LLM timeout')), 15000); // Increased to 15 seconds
+            });
 
       const response = await Promise.race([llmPromise, llmTimeout]);
       const content = response.choices[0]?.message?.content;
@@ -1150,9 +1151,9 @@ Include: critical gaps, risk level, top 3 recommendations.${industryContext ? ' 
         temperature: 1,
       });
       
-      const llmTimeout = new Promise<any>((_, reject) => {
-        setTimeout(() => reject(new Error('Executive summary LLM timeout')), 30000); // Increased to 30 seconds
-      });
+            const llmTimeout = new Promise<any>((_, reject) => {
+              setTimeout(() => reject(new Error('Executive summary LLM timeout')), 40000); // Increased to 40 seconds
+            });
 
       const response = await Promise.race([llmPromise, llmTimeout]);
       let summary = response.choices[0]?.message?.content || '';

@@ -34,10 +34,15 @@ export interface MCPServerConfig {
 }
 
 export class MCPClientManager {
+  // CRITICAL: Key clients by userId + serverName to ensure user isolation
+  // Format: `${userId}:${serverName}`
   private clients: Map<string, Client> = new Map();
   private configs: Map<string, MCPServerConfig> = new Map();
   private connectionCredentials: Map<string, any> = new Map(); // Store credentials for reconnection
   private connectionPromises: Map<string, Promise<Client>> = new Map(); // Prevent duplicate connections
+  // Track active connections per user to prevent resource exhaustion
+  private userConnectionCounts: Map<string, number> = new Map();
+  private readonly MAX_CONNECTIONS_PER_USER = 10; // Limit connections per user
 
   /**
    * Register an MCP server configuration
@@ -52,6 +57,7 @@ export class MCPClientManager {
    * - Prevents duplicate connections
    * - Stores credentials for reconnection
    * - Handles connection failures gracefully
+   * - Ensures user isolation (clients keyed by userId + serverName)
    */
   async connect(
     serverName: string,
@@ -60,16 +66,25 @@ export class MCPClientManager {
       apiKey?: string; // API key
       apiToken?: string; // API token
       customEnv?: Record<string, string>; // Custom environment variables
+      userId?: string; // CRITICAL: User ID for isolation
     }
   ): Promise<Client> {
+    const userId = credentials?.userId || 'anonymous';
+    const clientKey = `${userId}:${serverName}`;
+    
+    // Check user connection limit
+    const userConnections = this.userConnectionCounts.get(userId) || 0;
+    if (userConnections >= this.MAX_CONNECTIONS_PER_USER) {
+      throw new Error(`Maximum connections (${this.MAX_CONNECTIONS_PER_USER}) reached for user ${userId}. Please disconnect some connections first.`);
+    }
     const config = this.configs.get(serverName);
     if (!config) {
       throw new Error(`MCP server ${serverName} not registered`);
     }
 
     // Check if already connected and verify connection is still alive
-    if (this.clients.has(serverName)) {
-      const existingClient = this.clients.get(serverName)!;
+    if (this.clients.has(clientKey)) {
+      const existingClient = this.clients.get(clientKey)!;
       try {
         // Quick health check - try to list tools with short timeout
         await Promise.race([
@@ -80,32 +95,43 @@ export class MCPClientManager {
         return existingClient;
       } catch (error) {
         // Connection is dead, remove it and reconnect
-        console.warn(`[${serverName}] Existing connection is dead, reconnecting...`);
-        this.clients.delete(serverName);
-        this.connectionPromises.delete(serverName);
+        console.warn(`[${clientKey}] Existing connection is dead, reconnecting...`);
+        this.clients.delete(clientKey);
+        this.connectionPromises.delete(clientKey);
+        // Decrement user connection count
+        const currentCount = this.userConnectionCounts.get(userId) || 0;
+        this.userConnectionCounts.set(userId, Math.max(0, currentCount - 1));
       }
     }
 
     // Check if there's already a connection attempt in progress
-    if (this.connectionPromises.has(serverName)) {
-      return this.connectionPromises.get(serverName)!;
+    if (this.connectionPromises.has(clientKey)) {
+      return this.connectionPromises.get(clientKey)!;
     }
 
-    // Store credentials for potential reconnection
+    // Store credentials for potential reconnection (keyed by clientKey for user isolation)
     if (credentials) {
-      this.connectionCredentials.set(serverName, credentials);
+      this.connectionCredentials.set(clientKey, credentials);
     }
+
+    // Increment user connection count
+    this.userConnectionCounts.set(userId, userConnections + 1);
 
     // Create connection promise
     const connectionPromise = this._doConnect(serverName, config, credentials);
-    this.connectionPromises.set(serverName, connectionPromise);
+    this.connectionPromises.set(clientKey, connectionPromise);
 
     try {
       const client = await connectionPromise;
-      this.connectionPromises.delete(serverName);
+      this.connectionPromises.delete(clientKey);
+      // Store client with user-specific key
+      this.clients.set(clientKey, client);
       return client;
     } catch (error) {
-      this.connectionPromises.delete(serverName);
+      this.connectionPromises.delete(clientKey);
+      // Decrement user connection count on failure
+      const currentCount = this.userConnectionCounts.get(userId) || 0;
+      this.userConnectionCounts.set(userId, Math.max(0, currentCount - 1));
       throw error;
     }
   }
@@ -138,7 +164,9 @@ export class MCPClientManager {
         
         // Build environment variables
         const env: Record<string, string> = {
-          ...process.env,
+          ...Object.fromEntries(
+            Object.entries(process.env).filter(([_, v]) => v !== undefined) as [string, string][]
+          ),
           ...(config.env || {}),
         };
         
@@ -154,7 +182,7 @@ export class MCPClientManager {
         if (typeof credentials === 'string') {
           token = credentials;
         } else if (credentials) {
-          token = credentials.accessToken || credentials.apiToken || credentials.token || credentials.apiKey;
+          token = credentials.accessToken || credentials.apiToken || credentials.apiKey;
         }
         
         if (token) {
@@ -332,8 +360,15 @@ output = json
                   env.AWS_SHARED_CREDENTIALS_FILE = credentialsFile;
                   env.AWS_CONFIG_FILE = configFile;
                   
-                  // Disable loading from default locations
-                  env.AWS_SDK_LOAD_CONFIG = 'false';
+                  // CRITICAL: Enable config loading but ONLY from our specified files
+                  // Setting to 'false' prevents boto3 from reading our files
+                  env.AWS_SDK_LOAD_CONFIG = 'true';
+                  
+                  // CRITICAL: Explicitly set AWS credentials file location
+                  // This ensures boto3 uses our file and not ~/.aws/credentials
+                  process.env.AWS_SHARED_CREDENTIALS_FILE = credentialsFile;
+                  process.env.AWS_CONFIG_FILE = configFile;
+                  process.env.AWS_PROFILE = 'default';
                   
                   // Verify files exist and are readable
                   if (!fs.existsSync(credentialsFile) || !fs.existsSync(configFile)) {
@@ -351,8 +386,12 @@ output = json
                   }, 3600000); // 1 hour
                   
                   console.log(`[${serverName}] Created AWS credentials file with [default] profile: ${credentialsFile}`);
-                  console.log(`[${serverName}] AWS_PROFILE='default', AWS_SHARED_CREDENTIALS_FILE=${credentialsFile}, AWS_REGION=${validRegion}`);
+                  console.log(`[${serverName}] AWS_PROFILE='default', AWS_SHARED_CREDENTIALS_FILE=${credentialsFile}, AWS_CONFIG_FILE=${configFile}, AWS_REGION=${validRegion}`);
                   console.log(`[${serverName}] Verified credentials file contains [default] profile with valid keys and region`);
+                  console.log(`[${serverName}] CRITICAL: Set process.env.AWS_SHARED_CREDENTIALS_FILE=${credentialsFile} (absolute path)`);
+                  console.log(`[${serverName}] CRITICAL: Set process.env.AWS_CONFIG_FILE=${configFile} (absolute path)`);
+                  console.log(`[${serverName}] CRITICAL: Set process.env.AWS_PROFILE=default`);
+                  console.log(`[${serverName}] CRITICAL: Set process.env.AWS_SDK_LOAD_CONFIG=true (enables config file reading)`);
                 } catch (fileError: any) {
                   console.error(`[${serverName}] CRITICAL: Failed to create credentials file: ${fileError.message}`);
                   // If file creation fails, we MUST use environment variables
@@ -468,8 +507,8 @@ output = json
         );
         
         // Add error handler for process exit - this helps debug why the process closes
-        if (transport && typeof transport.on === 'function') {
-          transport.on('close', () => {
+        if (transport && 'on' in transport && typeof (transport as any).on === 'function') {
+          (transport as any).on('close', () => {
             console.warn(`[${serverName}] Transport closed - process may have exited unexpectedly`);
             if (serverName === 'github') {
               const tokenStatus = env.GITHUB_PERSONAL_ACCESS_TOKEN || env.GITHUB_TOKEN ? 'present' : 'missing';
@@ -603,7 +642,7 @@ output = json
         
         // The SDK exports SSEClientTransport (not SSEServerTransport)
         // SSEClientTransport is used to connect TO a remote SSE server (client-side)
-        const SSEClientTransport = sseModule.SSEClientTransport || sseModule.default;
+        const SSEClientTransport = sseModule.SSEClientTransport || (sseModule as any).default;
         
         if (!SSEClientTransport || typeof SSEClientTransport !== 'function') {
           throw new Error(`SSEClientTransport not found. Available exports: ${Object.keys(sseModule).join(', ')}`);
@@ -1113,17 +1152,24 @@ output = json
   async callTool(
     serverName: string,
     toolName: string,
-    args: Record<string, any>
+    args: Record<string, any>,
+    userId?: string // CRITICAL: User ID for client isolation
   ): Promise<any> {
-    let client = this.clients.get(serverName);
+    const clientKey = userId ? `${userId}:${serverName}` : serverName; // Fallback to serverName for backward compatibility
+    let client = this.clients.get(clientKey);
     if (!client) {
       // Try to reconnect if credentials are stored
-      const credentials = this.connectionCredentials.get(serverName);
+      const credentials = this.connectionCredentials.get(clientKey);
       if (credentials) {
-        console.warn(`[${serverName}] Client not in map but credentials exist, attempting to reconnect...`);
+        console.warn(`[${clientKey}] Client not in map but credentials exist, attempting to reconnect...`);
         try {
-          client = await this.reconnect(serverName);
-          console.log(`[${serverName}] Successfully reconnected for tool call`);
+          // Reconnect with userId if available
+          if (userId) {
+            client = await this.connect(serverName, { ...credentials, userId });
+          } else {
+            client = await this.reconnect(serverName);
+          }
+          console.log(`[${clientKey}] Successfully reconnected for tool call`);
         } catch (reconnectError: any) {
           throw new Error(`Server ${serverName} not connected and reconnection failed: ${reconnectError.message}. Please connect this MCP server first.`);
         }
@@ -1142,19 +1188,24 @@ output = json
       } catch (checkError: any) {
         // Connection might be closed, try to reconnect automatically
         if (checkError.message?.includes('closed') || checkError.message?.includes('ClosedResourceError') || checkError.message?.includes('session was closed')) {
-          console.warn(`[${serverName}] Connection appears closed, attempting to reconnect...`);
-          this.clients.delete(serverName);
+          console.warn(`[${clientKey}] Connection appears closed, attempting to reconnect...`);
+          this.clients.delete(clientKey);
           
           // Try to reconnect automatically
           try {
-            client = await this.reconnect(serverName);
-            console.log(`[${serverName}] Successfully reconnected`);
+            const credentials = this.connectionCredentials.get(clientKey);
+            if (userId && credentials) {
+              client = await this.connect(serverName, { ...credentials, userId });
+            } else {
+              client = await this.reconnect(serverName);
+            }
+            console.log(`[${clientKey}] Successfully reconnected`);
           } catch (reconnectError: any) {
             throw new Error(`Connection to ${serverName} was closed and reconnection failed: ${reconnectError.message}`);
           }
         } else {
           // If it's just a timeout, continue - connection might still work
-          console.warn(`[${serverName}] Connection health check timeout, but continuing with tool call`);
+          console.warn(`[${clientKey}] Connection health check timeout, but continuing with tool call`);
         }
       }
 
@@ -1245,25 +1296,31 @@ output = json
   /**
    * List available tools from a server
    */
-  async listTools(serverName: string): Promise<any[]> {
-    let client = this.clients.get(serverName);
+  async listTools(serverName: string, userId?: string): Promise<any[]> {
+    const clientKey = userId ? `${userId}:${serverName}` : serverName; // Fallback to serverName for backward compatibility
+    let client = this.clients.get(clientKey);
     if (!client) {
       // Try to reconnect if credentials are stored
-      const credentials = this.connectionCredentials.get(serverName);
+      const credentials = this.connectionCredentials.get(clientKey);
       if (credentials) {
-        console.warn(`[${serverName}] Client not in map for listTools but credentials exist, attempting to reconnect...`);
+        console.warn(`[${clientKey}] Client not in map for listTools but credentials exist, attempting to reconnect...`);
         try {
-          client = await this.reconnect(serverName);
+          // Reconnect with userId if available
+          if (userId) {
+            client = await this.connect(serverName, { ...credentials, userId });
+          } else {
+            client = await this.reconnect(serverName);
+          }
           // Verify client was stored and is valid
           if (!client) {
             throw new Error('Reconnect returned undefined client');
           }
           // Double-check client is in map
-          if (!this.clients.has(serverName)) {
-            console.warn(`[${serverName}] Client still not in map after reconnect, storing now...`);
-            this.clients.set(serverName, client);
+          if (!this.clients.has(clientKey)) {
+            console.warn(`[${clientKey}] Client still not in map after reconnect, storing now...`);
+            this.clients.set(clientKey, client);
           }
-          console.log(`[${serverName}] Successfully reconnected for listTools`);
+          console.log(`[${clientKey}] Successfully reconnected for listTools`);
         } catch (reconnectError: any) {
           throw new Error(`Server ${serverName} not connected and reconnection failed: ${reconnectError.message}`);
         }
@@ -1300,19 +1357,25 @@ output = json
       // Check if it's a connection closed error
       if (error.message?.includes('closed') || error.message?.includes('ClosedResourceError') || error.message?.includes('session was closed')) {
         // Try to reconnect automatically
-        console.log(`[${serverName}] Connection closed, attempting to reconnect...`);
-        this.clients.delete(serverName);
+        console.log(`[${clientKey}] Connection closed, attempting to reconnect...`);
+        this.clients.delete(clientKey);
         
         try {
-          const reconnectedClient = await this.reconnect(serverName);
+          const credentials = this.connectionCredentials.get(clientKey);
+          let reconnectedClient: Client;
+          if (userId && credentials) {
+            reconnectedClient = await this.connect(serverName, { ...credentials, userId });
+          } else {
+            reconnectedClient = await this.reconnect(serverName);
+          }
           if (!reconnectedClient) {
             throw new Error('Reconnect returned undefined client');
           }
           // Ensure client is stored
-          if (!this.clients.has(serverName)) {
-            this.clients.set(serverName, reconnectedClient);
+          if (!this.clients.has(clientKey)) {
+            this.clients.set(clientKey, reconnectedClient);
           }
-          console.log(`[${serverName}] Successfully reconnected, retrying listTools...`);
+          console.log(`[${clientKey}] Successfully reconnected, retrying listTools...`);
           
           // Retry listing tools after reconnection
           const response = await Promise.race([
@@ -1340,32 +1403,46 @@ output = json
   /**
    * Disconnect from a server
    */
-  async disconnect(serverName: string): Promise<void> {
-    const client = this.clients.get(serverName);
+  async disconnect(serverName: string, userId?: string): Promise<void> {
+    const clientKey = userId ? `${userId}:${serverName}` : serverName;
+    const client = this.clients.get(clientKey);
     if (client) {
       try {
         await client.close();
       } catch (error: any) {
-        console.warn(`[${serverName}] Error closing connection:`, error.message);
+        console.warn(`[${clientKey}] Error closing connection:`, error.message);
       } finally {
-        this.clients.delete(serverName);
-        this.connectionCredentials.delete(serverName);
-        this.connectionPromises.delete(serverName);
+        this.clients.delete(clientKey);
+        this.connectionCredentials.delete(clientKey);
+        this.connectionPromises.delete(clientKey);
+        // Decrement user connection count
+        if (userId) {
+          const currentCount = this.userConnectionCounts.get(userId) || 0;
+          this.userConnectionCounts.set(userId, Math.max(0, currentCount - 1));
+        }
       }
     }
   }
 
   /**
    * Disconnect from all servers
+   * Note: This disconnects all clients regardless of userId
+   * For user-specific cleanup, use disconnect(serverName, userId) instead
    */
   async disconnectAll(): Promise<void> {
-    const serverNames = Array.from(this.clients.keys());
-    const promises = serverNames.map(name => 
-      this.disconnect(name).catch(error => {
-        console.warn(`[${name}] Error during disconnect:`, error.message);
-      })
-    );
+    const clientKeys = Array.from(this.clients.keys());
+    const promises = clientKeys.map(clientKey => {
+      // Extract serverName and userId from clientKey (format: "userId:serverName" or just "serverName")
+      const parts = clientKey.split(':');
+      const serverName = parts.length > 1 ? parts[1] : parts[0];
+      const userId = parts.length > 1 ? parts[0] : undefined;
+      return this.disconnect(serverName, userId).catch(error => {
+        console.warn(`[${clientKey}] Error during disconnect:`, error.message);
+      });
+    });
     await Promise.allSettled(promises);
+    // Clear all connection counts
+    this.userConnectionCounts.clear();
   }
 }
 

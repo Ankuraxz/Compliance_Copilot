@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
           where: { id: agentRun.id },
           data: {
             status: finalState.status === 'completed' ? 'completed' : 'failed',
-            output: finalState.data,
+            output: finalState.data as any,
             error: finalState.errors.length > 0 ? finalState.errors.join('\n') : null,
             completedAt: new Date(),
           },

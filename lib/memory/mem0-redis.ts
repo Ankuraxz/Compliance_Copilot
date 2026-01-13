@@ -28,7 +28,7 @@ function getSharedRedisClient(redisUrl?: string): ReturnType<typeof createClient
     connectionPromise = null;
   }
   
-  // Create new client with connection pooling
+  // Create new client with connection pooling for multi-user support
   sharedRedisClient = createClient({
     url,
     socket: {
@@ -39,7 +39,13 @@ function getSharedRedisClient(redisUrl?: string): ReturnType<typeof createClient
         }
         return Math.min(retries * 100, 3000);
       },
+      // Connection timeout for multi-user scenarios
+      connectTimeout: 10000, // 10 seconds
+      // Keep connection alive
+      keepAlive: 30000, // 30 seconds
     },
+    // Connection pool settings
+    // Note: Redis client handles pooling internally, but we set reasonable limits
   });
   
   sharedRedisUrl = url;

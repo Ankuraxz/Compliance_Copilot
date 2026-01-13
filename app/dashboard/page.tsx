@@ -339,7 +339,7 @@ export default function DashboardPage() {
                   variant="bordered"
                 >
                   {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
+                    <SelectItem key={project.id}>
                       {project.name}
                     </SelectItem>
                   ))}

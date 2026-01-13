@@ -60,9 +60,9 @@ export async function POST(request: NextRequest) {
       customEnv,
     };
 
-    // Test connection
+    // Test connection with userId for isolation
     try {
-      await mcpClientManager.connect(serverName, credentials);
+      await mcpClientManager.connect(serverName, { ...credentials, userId: user.id });
     } catch (error: any) {
       return NextResponse.json(
         { error: `Connection test failed: ${error.message}` },

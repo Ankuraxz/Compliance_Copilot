@@ -27,7 +27,7 @@ export class ComplianceOrchestrator {
       channels: {
         projectId: { reducer: (x: string) => x },
         framework: { reducer: (x: string) => x },
-        status: { reducer: (x: string) => x },
+        status: { reducer: (x: 'pending' | 'running' | 'completed' | 'failed', y?: 'pending' | 'running' | 'completed' | 'failed') => (y || x) as 'pending' | 'running' | 'completed' | 'failed' },
         currentStep: { reducer: (x: string) => x },
         data: { reducer: (x: any, y: any) => ({ ...x, ...y }) },
         errors: { reducer: (x: string[], y: string[]) => [...(x || []), ...(y || [])] },
@@ -63,8 +63,8 @@ export class ComplianceOrchestrator {
       });
 
       // Remember state after intake
-      await this.memory.rememberState(result, 'intake');
-      return result;
+      await this.memory.rememberState(result as AgentState, 'intake');
+      return result as Partial<AgentState>;
     });
 
     workflow.addNode('regulation_rag', async (state: AgentState) => {
@@ -74,10 +74,10 @@ export class ComplianceOrchestrator {
       );
 
       const graph = regulationAgent.createGraph();
-      const result = await graph.invoke(state);
+      const result = await graph.invoke(state as any);
       
-      await this.memory.rememberState(result, 'regulation_rag');
-      return result;
+      await this.memory.rememberState(result as AgentState, 'regulation_rag');
+      return result as Partial<AgentState>;
     });
 
     workflow.addNode('gap_analysis', async (state: AgentState) => {
@@ -87,7 +87,7 @@ export class ComplianceOrchestrator {
       );
 
       const graph = gapAgent.createGraph();
-      const result = await graph.invoke(state);
+      const result = await graph.invoke(state as any);
       
       // Remember findings
       if (result.data?.gaps) {
@@ -96,8 +96,8 @@ export class ComplianceOrchestrator {
         }
       }
       
-      await this.memory.rememberState(result, 'gap_analysis');
-      return result;
+      await this.memory.rememberState(result as AgentState, 'gap_analysis');
+      return result as Partial<AgentState>;
     });
 
     workflow.addNode('action_planner', async (state: AgentState) => {
@@ -107,15 +107,15 @@ export class ComplianceOrchestrator {
       );
 
       const graph = plannerAgent.createGraph();
-      const result = await graph.invoke(state);
+      const result = await graph.invoke(state as any);
       
-      await this.memory.rememberState(result, 'action_planner');
-      return result;
+      await this.memory.rememberState(result as AgentState, 'action_planner');
+      return result as Partial<AgentState>;
     });
 
     workflow.addNode('reporting', async (state: AgentState) => {
       const graph = reportingAgent.createGraph();
-      const result = await graph.invoke(state);
+      const result = await graph.invoke(state as any);
       
       // Remember final assessment
       if (result.data?.report) {
@@ -125,17 +125,18 @@ export class ComplianceOrchestrator {
         );
       }
       
-      await this.memory.rememberState(result, 'reporting');
-      return result;
+      await this.memory.rememberState(result as AgentState, 'reporting');
+      return result as Partial<AgentState>;
     });
 
     // Define flow
-    workflow.addEdge(START, 'intake');
-    workflow.addEdge('intake', 'regulation_rag');
-    workflow.addEdge('regulation_rag', 'gap_analysis');
-    workflow.addEdge('gap_analysis', 'action_planner');
-    workflow.addEdge('action_planner', 'reporting');
-    workflow.addEdge('reporting', END);
+    // LangGraph type definitions are overly strict - use type assertions
+    (workflow as any).addEdge(START, 'intake');
+    (workflow as any).addEdge('intake', 'regulation_rag');
+    (workflow as any).addEdge('regulation_rag', 'gap_analysis');
+    (workflow as any).addEdge('gap_analysis', 'action_planner');
+    (workflow as any).addEdge('action_planner', 'reporting');
+    (workflow as any).addEdge('reporting', END);
 
     return workflow.compile();
   }
@@ -170,17 +171,19 @@ export class ComplianceOrchestrator {
 
     // Stream updates if callback provided
     if (onUpdate) {
-      const stream = graph.stream(finalState);
+      const stream = await graph.stream(finalState as any);
       for await (const update of stream) {
         const nodeUpdate = Object.values(update)[0];
-        finalState = { ...finalState, ...nodeUpdate };
-        onUpdate(finalState);
+        if (nodeUpdate && typeof nodeUpdate === 'object') {
+          finalState = { ...finalState, ...(nodeUpdate as any) };
+        }
+        onUpdate(finalState as AgentState);
       }
     } else {
-      finalState = await graph.invoke(finalState);
+      finalState = (await graph.invoke(finalState as any)) as any;
     }
 
-    return finalState;
+    return finalState as any as AgentState;
   }
 }
 

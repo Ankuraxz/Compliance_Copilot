@@ -10,6 +10,12 @@ export const prisma =
     log: process.env.NODE_ENV === 'production' 
       ? ['error', 'warn'] // Reduce logging in production
       : ['query', 'error', 'warn'],
+    // Connection pooling for multi-user support
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
+    },
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma

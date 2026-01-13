@@ -55,7 +55,7 @@ async function saveFindingsToDatabase(
         projectId,
         frameworkId: frameworkRecord.id,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { startedAt: 'desc' },
     });
 
     if (!assessment) {
@@ -292,7 +292,7 @@ export async function GET(request: NextRequest) {
               extractionResults: state.extractionResults.length,
               errors: state.errors.length,
               errorsList: state.errors,
-              toolCalls: state.toolCalls || [], // Include tool calls for stats
+              toolCalls: (state as any).toolCalls || [], // Include tool calls for stats
             },
           });
         });

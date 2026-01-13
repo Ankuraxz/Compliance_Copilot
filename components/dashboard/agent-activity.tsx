@@ -239,7 +239,7 @@ export function AgentActivityMonitor({ agentRunId }: AgentActivityMonitorProps) 
               progress: calculatedProgress,
               lastUpdate: new Date(),
               error: data.error || (data.data?.errorsList && data.data.errorsList.length > 0 ? data.data.errorsList[data.data.errorsList.length - 1] : undefined),
-              logs: [...(existing.logs || []), newLog],
+              logs: [...((existing as AgentState).logs || []), newLog],
               phase: getPhaseFromAgent(agentName),
             };
 

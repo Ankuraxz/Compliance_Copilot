@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     // Connect if not already connected
     try {
-      await mcpClientManager.connect(serverName, token);
+      await mcpClientManager.connect(serverName, { accessToken: token, userId: user.id });
     } catch (error) {
       // If connection fails, might need to re-authenticate
       return NextResponse.json(
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const tools = await mcpClientManager.listTools(serverName);
+    const tools = await mcpClientManager.listTools(serverName, user.id);
 
     return NextResponse.json({ tools });
   } catch (error: any) {
@@ -99,9 +99,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Connect if not already connected
-    await mcpClientManager.connect(serverName, token);
+    await mcpClientManager.connect(serverName, { accessToken: token, userId: user.id });
 
-    const result = await mcpClientManager.callTool(serverName, toolName, args || {});
+    const result = await mcpClientManager.callTool(serverName, toolName, args || {}, user.id);
 
     return NextResponse.json({ result });
   } catch (error: any) {

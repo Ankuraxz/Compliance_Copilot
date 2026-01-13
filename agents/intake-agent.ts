@@ -25,11 +25,11 @@ export class IntakeAgent {
       channels: {
         projectId: { reducer: (x: string) => x },
         framework: { reducer: (x: string) => x },
-        status: { reducer: (x: string) => x },
+        status: { reducer: (x: 'pending' | 'running' | 'completed' | 'failed', y?: 'pending' | 'running' | 'completed' | 'failed') => (y || x) as 'pending' | 'running' | 'completed' | 'failed' },
         currentStep: { reducer: (x: string) => x },
         data: { reducer: (x: any) => x },
-        errors: { reducer: (x: string[], y: string[]) => [...x, ...y] },
-        toolCalls: { reducer: (x: any[], y: any[]) => [...x, ...y] },
+        errors: { reducer: (x: string[], y: string[]) => [...(x || []), ...(y || [])] },
+        toolCalls: { reducer: (x: any[], y: any[]) => [...(x || []), ...(y || [])] },
       },
     });
 
@@ -38,11 +38,12 @@ export class IntakeAgent {
     workflow.addNode('crawl_documentation', this.crawlDocumentation.bind(this));
     workflow.addNode('process_data', this.processData.bind(this));
 
-    workflow.addEdge(START, 'crawl_codebase');
-    workflow.addEdge('crawl_codebase', 'crawl_infrastructure');
-    workflow.addEdge('crawl_infrastructure', 'crawl_documentation');
-    workflow.addEdge('crawl_documentation', 'process_data');
-    workflow.addEdge('process_data', END);
+    // LangGraph type definitions are overly strict - use type assertions
+    (workflow as any).addEdge(START, 'crawl_codebase');
+    (workflow as any).addEdge('crawl_codebase', 'crawl_infrastructure');
+    (workflow as any).addEdge('crawl_infrastructure', 'crawl_documentation');
+    (workflow as any).addEdge('crawl_documentation', 'process_data');
+    (workflow as any).addEdge('process_data', END);
 
     return workflow.compile();
   }
@@ -61,7 +62,7 @@ export class IntakeAgent {
         throw new Error('GitHub token not available');
       }
 
-      await mcpClientManager.connect('github', githubToken);
+      await mcpClientManager.connect('github', { apiToken: githubToken });
 
       // List repositories
       const repos = await mcpClientManager.callTool('github', 'list_repos', {});
@@ -173,7 +174,7 @@ export class IntakeAgent {
         try {
           const cloudflareToken = process.env.CLOUDFLARE_TOKEN;
           if (cloudflareToken) {
-            await mcpClientManager.connect('cloudflare', cloudflareToken);
+            await mcpClientManager.connect('cloudflare', { apiToken: cloudflareToken });
             const resources = await mcpClientManager.callTool('cloudflare', 'list_resources', {});
             infrastructure.push(...resources.map((r: any) => ({
               type: 'cloudflare',

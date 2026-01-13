@@ -6,9 +6,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { mcpClientManager } from '@/mcp/client';
 import { prisma } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
+    // Authentication check
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { findingIds, provider } = await request.json();
 
     if (!findingIds || !Array.isArray(findingIds) || findingIds.length === 0) {
@@ -58,7 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Connect to MCP server
-    await mcpClientManager.connect(provider, token);
+    await mcpClientManager.connect(provider, { accessToken: token, userId: user.id });
 
     const syncedTasks = [];
 
@@ -69,7 +80,7 @@ export async function POST(request: NextRequest) {
           title: task.title,
           description: task.description,
           priority: task.priority,
-          labels: ['compliance', task.finding.requirement?.framework || ''],
+          labels: ['compliance', task.finding.requirement?.code || ''],
         });
 
         // Update task with external ticket info

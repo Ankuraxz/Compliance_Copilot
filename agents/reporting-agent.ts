@@ -3,7 +3,7 @@
  * Generates compliance assessment reports
  */
 
-import { StateGraph, END } from '@langchain/langgraph';
+import { StateGraph, END, START } from '@langchain/langgraph';
 import { AgentState, AssessmentReport } from './types';
 import { prisma } from '@/lib/db';
 
@@ -16,11 +16,11 @@ export class ReportingAgent {
       channels: {
         projectId: { reducer: (x: string) => x },
         framework: { reducer: (x: string) => x },
-        status: { reducer: (x: string) => x },
+        status: { reducer: (x: 'pending' | 'running' | 'completed' | 'failed', y?: 'pending' | 'running' | 'completed' | 'failed') => (y || x) as 'pending' | 'running' | 'completed' | 'failed' },
         currentStep: { reducer: (x: string) => x },
         data: { reducer: (x: any) => x },
-        errors: { reducer: (x: string[], y: string[]) => [...x, ...y] },
-        toolCalls: { reducer: (x: any[], y: any[]) => [...x, ...y] },
+        errors: { reducer: (x: string[], y: string[]) => [...(x || []), ...(y || [])] },
+        toolCalls: { reducer: (x: any[], y: any[]) => [...(x || []), ...(y || [])] },
       },
     });
 
@@ -28,9 +28,11 @@ export class ReportingAgent {
     workflow.addNode('generate_summary', this.generateSummary.bind(this));
     workflow.addNode('save_assessment', this.saveAssessment.bind(this));
 
-    workflow.addEdge('calculate_scores', 'generate_summary');
-    workflow.addEdge('generate_summary', 'save_assessment');
-    workflow.addEdge('save_assessment', END);
+    // LangGraph type definitions are overly strict - use type assertions
+    (workflow as any).addEdge(START, 'calculate_scores');
+    (workflow as any).addEdge('calculate_scores', 'generate_summary');
+    (workflow as any).addEdge('generate_summary', 'save_assessment');
+    (workflow as any).addEdge('save_assessment', END);
 
     return workflow.compile();
   }
@@ -123,10 +125,10 @@ export class ReportingAgent {
       const framework = state.framework;
 
       // Generate summary
-      const summary = this.generateTextSummary(report, gaps, framework);
+      const summary = report ? this.generateTextSummary(report, gaps, framework) : 'No assessment report available.';
 
       // Generate recommendations
-      const recommendations = this.generateRecommendations(gaps, report);
+      const recommendations = report ? this.generateRecommendations(gaps, report) : [];
 
       return {
         data: {
