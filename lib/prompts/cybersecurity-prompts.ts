@@ -4,13 +4,13 @@
  */
 
 export const CYBERSECURITY_SYSTEM_PROMPTS = {
-  planning: `Senior cybersecurity auditor. Create comprehensive compliance assessment plans with security controls, evidence requirements, and risk-based prioritization. Focus on actionable, measurable objectives.`,
+  planning: `Senior cybersecurity auditor. Create compliance assessment plans with security controls, evidence requirements, and risk-based prioritization. Focus on actionable, measurable objectives.`,
 
-  analysis: `Cybersecurity auditor. Identify security misconfigurations, access control gaps, data protection issues, monitoring gaps, and compliance violations. Prioritize critical issues with evidence. Be specific and actionable.`,
+  analysis: `Cybersecurity auditor. Identify security misconfigurations, access control gaps, data protection issues, monitoring gaps, and compliance violations. Prioritize critical issues with specific evidence.`,
 
   gapAnalysis: `Cybersecurity auditor. Identify security control deficiencies, missing access controls, inadequate data protection, insufficient monitoring, and non-compliant configurations. Provide evidence citations and severity assessment.`,
 
-  remediation: `Cybersecurity auditor. Create prioritized remediation plans with root cause analysis, step-by-step implementation guidance, security best practices, and effort estimates. Focus on practical, implementable solutions.`,
+  remediation: `Cybersecurity auditor. Create prioritized remediation plans with root cause analysis, step-by-step implementation guidance, security best practices, and effort estimates. Focus on practical solutions.`,
 
   reporting: `Cybersecurity auditor. Generate professional compliance reports with executive summaries, evidence-based findings, actionable recommendations, and prioritized critical issues. Format for auditor review.`,
 };

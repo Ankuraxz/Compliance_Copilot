@@ -394,18 +394,17 @@ export class ReportGenerationAgent {
       }
     }
     
-    const prompt = `Generate a professional compliance analysis report for ${swarmState.framework} framework.
+    const prompt = `Generate compliance analysis report for ${swarmState.framework}.
 
-Context from extraction agents:
-${enhancedContext}
+Context: ${enhancedContext.substring(0, 8000)}
 
-Generate 3-4 professional sections (300 words max each, 2 evidence max per section) covering:
+Generate 3-4 sections (300 words max each, 2 evidence max per section):
 1. Security Controls Assessment
 2. Access Control & Identity Management
 3. Data Protection & Encryption
 4. Monitoring & Incident Response
 
-Each section must include specific findings, evidence citations, and compliance status. Reference best practices from research context when relevant.
+Each section: specific findings, evidence citations, compliance status. Reference research context when relevant.
 
 Return JSON: {"sections": [{"title": "...", "content": "...", "evidence": [{"source": "...", "type": "...", "citation": "..."}]}]}`;
 

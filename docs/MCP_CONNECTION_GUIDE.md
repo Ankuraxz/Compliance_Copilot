@@ -1,435 +1,561 @@
-# MCP Connection Guide
+# 🔗 MCP Connection Guide
 
-This guide explains how to connect your external accounts (AWS, Azure, Atlassian, etc.) to Compliance Copilot using either OAuth or BYOK (Bring Your Own Key).
-
-## OAuth Callback URL Configuration
-
-**Important**: Before setting up OAuth connections, configure your application URL:
-
-1. **Set Environment Variable**:
-   - Add to your `.env` file:
-     ```env
-     # Local development
-     NEXT_PUBLIC_APP_URL="http://localhost:3000"
-     
-     # Production
-     NEXT_PUBLIC_APP_URL="https://your-domain.com"
-     ```
-
-2. **Callback URL Format**:
-   - The callback URL is automatically generated as: `${NEXT_PUBLIC_APP_URL}/api/auth/oauth/{serverName}/callback`
-   - Examples:
-     - GitHub (local): `http://localhost:3000/api/auth/oauth/github/callback`
-     - GitHub (production): `https://your-domain.com/api/auth/oauth/github/callback`
-     - Atlassian (local): `http://localhost:3000/api/auth/oauth/atlassian/callback`
-     - Cloudflare (production): `https://your-domain.com/api/auth/oauth/cloudflare/callback`
-
-3. **When Creating OAuth Apps**:
-   - Use the callback URL format above for each service
-   - Make sure the URL matches exactly (including `/api/auth/oauth/` path)
-
-## Connection Methods
-
-### 1. OAuth (Recommended)
-- **Best for**: Services that support OAuth 2.0/2.1
-- **Security**: Tokens are managed automatically, can be revoked
-- **Setup**: One-click connection through the UI
-
-### 2. BYOK (Bring Your Own Key)
-- **Best for**: Services that require API keys/tokens or environment variables
-- **Security**: You manage your own credentials
-- **Setup**: Enter credentials manually in the UI
-
-## How to Connect Accounts
-
-### Via Dashboard UI
-
-1. **Navigate to Dashboard** → **MCP Connections** tab
-2. **Select the service** you want to connect (e.g., AWS, Azure, Atlassian)
-3. **Choose connection method**:
-   - Click **"OAuth"** button if available (recommended)
-   - Click **"BYOK"** button to enter credentials manually
-4. **Follow the prompts**:
-   - **OAuth**: You'll be redirected to authorize the app
-   - **BYOK**: Enter your API key, token, or environment variables
-5. **Verify connection**: Green checkmark indicates successful connection
+> **Connect your external services to Compliance Copilot** using OAuth or BYOK (Bring Your Own Key) authentication methods.
 
 ---
 
-## Service-Specific Instructions
+## 📋 Table of Contents
 
-### AWS Account Connection
+- [Quick Start](#quick-start)
+- [Connection Methods](#connection-methods)
+- [OAuth Setup](#oauth-setup)
+- [Service-Specific Guides](#service-specific-guides)
+- [Security Best Practices](#security-best-practices)
+- [Troubleshooting](#troubleshooting)
 
-#### Option 1: BYOK (Environment Variables) - Recommended
+---
 
-1. **Get AWS Credentials**:
-   - Go to AWS Console → IAM → Users → Your User → Security Credentials
-   - Create Access Key (if you don't have one)
-   - Download or copy:
-     - Access Key ID
-     - Secret Access Key
-   - Note your AWS Region (e.g., `us-east-1`)
+## 🚀 Quick Start
 
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Cloud & Infrastructure
-   - Click **"BYOK"** on AWS Core
-   - Select **"Environment Variables"**
-   - Enter JSON:
-     ```json
-     {
-       "AWS_ACCESS_KEY_ID": "your_access_key_id",
-       "AWS_SECRET_ACCESS_KEY": "your_secret_access_key",
-       "AWS_REGION": "us-east-1"
-     }
-     ```
-   - Click **"Connect"**
+### Step 1: Navigate to Connections
 
-#### Option 2: AWS Profile (Advanced)
+1. Go to **Dashboard** → **MCP Connections** tab
+2. Select the service you want to connect
+3. Choose your authentication method:
+   - **OAuth** (Recommended) - One-click secure connection
+   - **BYOK** - Manual credential entry
 
-If you use AWS CLI profiles:
+### Step 2: Configure OAuth Callback URL
+
+**Important**: Before setting up OAuth connections, configure your application URL:
+
+```env
+# Local development
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+
+# Production
+NEXT_PUBLIC_APP_URL="https://your-domain.com"
+```
+
+**Callback URL Format**: `${NEXT_PUBLIC_APP_URL}/api/auth/oauth/{serverName}/callback`
+
+**Examples**:
+- GitHub (local): `http://localhost:3000/api/auth/oauth/github/callback`
+- GitHub (production): `https://your-domain.com/api/auth/oauth/github/callback`
+- Atlassian: `https://your-domain.com/api/auth/oauth/atlassian/callback`
+
+---
+
+## 🔐 Connection Methods
+
+### OAuth 2.0/2.1 (Recommended) ✅
+
+**Best for**: Services that support OAuth (GitHub, Atlassian, Cloudflare, etc.)
+
+**Advantages**:
+- ✅ One-click connection through the UI
+- ✅ Tokens managed automatically
+- ✅ Can be revoked easily
+- ✅ More secure (no credential storage)
+
+**How it works**:
+1. Click **"OAuth"** button on the service
+2. You'll be redirected to authorize the app
+3. Grant necessary permissions
+4. You'll be redirected back with a secure token
+5. Connection is established automatically
+
+### BYOK (Bring Your Own Key) 🔑
+
+**Best for**: Services requiring API keys/tokens or environment variables
+
+**Advantages**:
+- ✅ Full control over credentials
+- ✅ Works with any service
+- ✅ Can use existing API keys
+
+**How it works**:
+1. Click **"BYOK"** button on the service
+2. Choose authentication type:
+   - **API Key** - Single key authentication
+   - **API Token** - Token-based authentication
+   - **Environment Variables** - JSON format for multiple variables
+3. Enter your credentials
+4. For SSE/HTTP servers (like Instana), provide the server URL
+5. Click **"Connect"**
+
+---
+
+## 🌐 OAuth Setup
+
+### Prerequisites
+
+1. **Set Environment Variable**:
+   ```env
+   NEXT_PUBLIC_APP_URL="https://your-domain.com"
+   ```
+
+2. **Create OAuth App** in the service's developer portal
+
+3. **Configure Callback URL**:
+   - Use the format: `${NEXT_PUBLIC_APP_URL}/api/auth/oauth/{serverName}/callback`
+   - Example: `https://your-domain.com/api/auth/oauth/github/callback`
+
+4. **Copy Credentials**:
+   - Client ID
+   - Client Secret
+   - (These are configured server-side)
+
+### OAuth Flow
+
+```
+User → Click "OAuth" → Redirect to Service → Authorize → Callback → Token Stored → Connected ✅
+```
+
+---
+
+## 📚 Service-Specific Guides
+
+### ☁️ Cloud & Infrastructure
+
+#### AWS Core
+
+**Method**: BYOK (Environment Variables)
+
+**Required Credentials**:
 ```json
 {
-  "AWS_PROFILE": "your-profile-name"
+  "AWS_ACCESS_KEY_ID": "your_access_key_id",
+  "AWS_SECRET_ACCESS_KEY": "your_secret_access_key",
+  "AWS_REGION": "us-east-1"
 }
 ```
 
-**Required Permissions**: The AWS credentials need permissions for:
+**How to Get**:
+1. AWS Console → IAM → Users → Your User → Security Credentials
+2. Create Access Key
+3. Download or copy Access Key ID and Secret Access Key
+4. Note your AWS Region
+
+**Required Permissions**:
 - EC2, S3, RDS, IAM, CloudWatch, Lambda, and other services you want to analyze
 
 ---
 
-### Azure Account Connection
+#### Azure
 
-#### BYOK (Environment Variables)
+**Method**: BYOK (Environment Variables)
 
-1. **Get Azure Credentials**:
-   - Go to Azure Portal → Azure Active Directory → App Registrations
-   - Create a new app registration (or use existing)
-   - Note:
-     - Application (client) ID
-     - Directory (tenant) ID
-   - Go to Certificates & secrets → Create a new client secret
-   - Copy the secret value (you won't see it again!)
+**Required Credentials**:
+```json
+{
+  "AZURE_CLIENT_ID": "your_client_id",
+  "AZURE_CLIENT_SECRET": "your_client_secret",
+  "AZURE_TENANT_ID": "your_tenant_id"
+}
+```
 
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Cloud & Infrastructure
-   - Click **"BYOK"** on Azure
-   - Select **"Environment Variables"**
-   - Enter JSON:
-     ```json
-     {
-       "AZURE_CLIENT_ID": "your_client_id",
-       "AZURE_CLIENT_SECRET": "your_client_secret",
-       "AZURE_TENANT_ID": "your_tenant_id"
-     }
-     ```
-   - Click **"Connect"**
+**How to Get**:
+1. Azure Portal → Azure Active Directory → App Registrations
+2. Create new app registration (or use existing)
+3. Note Application (client) ID and Directory (tenant) ID
+4. Go to Certificates & secrets → Create new client secret
+5. Copy the secret value (you won't see it again!)
 
-**Required Permissions**: The Azure app needs:
+**Required Permissions**:
 - `Azure Service Management` (for resource management)
 - `User.Read` (for authentication)
 
 ---
 
-### Atlassian (JIRA/Confluence) Connection
+#### Google Cloud (GCloud)
 
-#### Option 1: OAuth (Recommended)
+**Method**: BYOK (Environment Variables)
 
-1. **Create OAuth App in Atlassian**:
-   - Go to https://developer.atlassian.com/console/myapps/
-   - Create a new OAuth 2.0 integration
-   - Set Authorization callback URL: `https://your-domain.com/auth/callback`
-   - Note Client ID and Client Secret
-   - Add scopes: `read:jira-work`, `read:confluence-content.all`
+**Required Credentials**:
+```json
+{
+  "GCLOUD_PROJECT": "your-project-id",
+  "GOOGLE_APPLICATION_CREDENTIALS": "path/to/service-account-key.json"
+}
+```
 
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Communication
-   - Click **"OAuth"** on Atlassian
-   - Authorize the app when redirected
-
-#### Option 2: BYOK (API Token)
-
-1. **Get API Token**:
-   - Go to https://id.atlassian.com/manage-profile/security/api-tokens
-   - Create API token
-   - Copy the token
-
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Communication
-   - Click **"BYOK"** on Atlassian
-   - Select **"API Token"**
-   - Enter:
-     - API Token: `your_api_token`
-     - Domain: `your-domain.atlassian.net`
-   - Click **"Connect"**
+**How to Get**:
+1. Google Cloud Console → IAM & Admin → Service Accounts
+2. Create service account
+3. Download JSON key file
+4. Note your Project ID
 
 ---
 
-### GitHub Connection
+#### Cloudflare
 
-#### Option 1: OAuth (Recommended)
+**Method**: OAuth or BYOK (API Token)
 
-1. **Create GitHub OAuth App**:
-   - Go to GitHub → Settings → Developer settings → OAuth Apps
-   - Create new OAuth App
-   - Set Authorization callback URL:
-     - **Local development**: `http://localhost:3000/api/auth/oauth/github/callback`
-     - **Production**: `https://your-domain.com/api/auth/oauth/github/callback`
-     - The callback URL is automatically generated from `NEXT_PUBLIC_APP_URL` environment variable
-   - Note Client ID and Client Secret
+**OAuth Setup**:
+1. Cloudflare Dashboard → My Profile → API Tokens
+2. Create OAuth Client (if available)
+3. Note Client ID and Secret
 
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Code & CI/CD
-   - Click **"OAuth"** on GitHub
-   - Authorize the app
-
-#### Option 2: BYOK (Personal Access Token)
-
-1. **Create Personal Access Token**:
-   - Go to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
-   - Generate new token (classic)
-   - Select scopes: `repo`, `read:org`, `read:user`
-   - Copy the token
-
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Code & CI/CD
-   - Click **"BYOK"** on GitHub
-   - Select **"API Token"**
-   - Enter your token
-   - Click **"Connect"**
+**BYOK Setup**:
+1. Cloudflare Dashboard → My Profile → API Tokens
+2. Create Token with permissions: `Zone:Read`, `Account:Read`
+3. Copy the token
 
 ---
 
-### Cloudflare Connection
+### 💻 Code & CI/CD
 
-#### Option 1: OAuth
+#### GitHub
 
-1. **Create Cloudflare OAuth App**:
-   - Go to Cloudflare Dashboard → My Profile → API Tokens
-   - Create OAuth Client (if available)
-   - Note Client ID and Secret
+**Method**: OAuth (Recommended) or BYOK (Personal Access Token)
 
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Cloud & Infrastructure
-   - Click **"OAuth"** on Cloudflare
+**OAuth Setup**:
+1. GitHub → Settings → Developer settings → OAuth Apps
+2. Create new OAuth App
+3. Set Authorization callback URL:
+   - **Local**: `http://localhost:3000/api/auth/oauth/github/callback`
+   - **Production**: `https://your-domain.com/api/auth/oauth/github/callback`
+4. Note Client ID and Client Secret
 
-#### Option 2: BYOK (API Token)
-
-1. **Get API Token**:
-   - Go to Cloudflare Dashboard → My Profile → API Tokens
-   - Create Token with permissions: `Zone:Read`, `Account:Read`
-   - Copy the token
-
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Cloud & Infrastructure
-   - Click **"BYOK"** on Cloudflare
-   - Select **"API Token"**
-   - Enter your token
-   - Click **"Connect"**
+**BYOK Setup**:
+1. GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. Generate new token (classic)
+3. Select scopes: `repo`, `read:org`, `read:user`
+4. Copy the token
 
 ---
 
-### SonarQube Connection
+#### ArgoCD
 
-#### BYOK (API Token)
+**Method**: BYOK (API Token)
 
-1. **Get SonarQube Token**:
-   - Log in to SonarQube
-   - Go to My Account → Security → Generate Token
-   - Copy the token
-   - Note your SonarQube server URL
+**Required Credentials**:
+```json
+{
+  "ARGOCD_API_TOKEN": "your_token",
+  "ARGOCD_SERVER": "https://your-argocd-server.com",
+  "ARGOCD_USERNAME": "your_username"
+}
+```
 
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Code & CI/CD
-   - Click **"BYOK"** on SonarQube
-   - Select **"Environment Variables"**
-   - Enter JSON:
-     ```json
-     {
-       "SONARQUBE_TOKEN": "your_token",
-       "SONARQUBE_URL": "https://your-sonarqube-server.com"
-     }
-     ```
-   - Click **"Connect"**
+**How to Get**:
+1. Log in to ArgoCD CLI or UI
+2. Generate token: `argocd account generate-token`
+3. Or get from ArgoCD UI → User Info → Generate New Token
+4. Note your ArgoCD server URL
 
 ---
 
-### Sentry Connection
+#### SonarQube
 
-#### BYOK (API Token)
+**Method**: BYOK (API Token)
 
-1. **Get Sentry Token**:
-   - Go to Sentry → Settings → Auth Tokens
-   - Create new token
-   - Select scopes: `org:read`, `project:read`, `event:read`
-   - Copy the token
-   - Note your Organization slug and Project slug
+**Required Credentials**:
+```json
+{
+  "SONARQUBE_TOKEN": "your_token",
+  "SONARQUBE_URL": "https://your-sonarqube-server.com"
+}
+```
 
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Monitoring
-   - Click **"BYOK"** on Sentry
-   - Select **"Environment Variables"**
-   - Enter JSON:
-     ```json
-     {
-       "SENTRY_API_TOKEN": "your_token",
-       "SENTRY_ORG": "your-org-slug",
-       "SENTRY_PROJECT": "your-project-slug"
-     }
-     ```
-   - Click **"Connect"**
+**How to Get**:
+1. Log in to SonarQube
+2. Go to My Account → Security → Generate Token
+3. Copy the token
+4. Note your SonarQube server URL
 
 ---
 
-### ArgoCD Connection
+### 📊 Monitoring & Observability
 
-#### BYOK (API Token)
+#### Instana
 
-1. **Get ArgoCD Token**:
-   - Log in to ArgoCD CLI or UI
-   - Generate token: `argocd account generate-token`
-   - Or get from ArgoCD UI → User Info → Generate New Token
-   - Note your ArgoCD server URL
+**Method**: BYOK (API Key + Server URL)
 
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Code & CI/CD
-   - Click **"BYOK"** on ArgoCD
-   - Select **"Environment Variables"**
-   - Enter JSON:
-     ```json
-     {
-       "ARGOCD_API_TOKEN": "your_token",
-       "ARGOCD_SERVER": "https://your-argocd-server.com",
-       "ARGOCD_USERNAME": "your_username"
-     }
-     ```
-   - Click **"Connect"**
+**Prerequisites**:
+1. Deploy Instana MCP server:
+   ```bash
+   # Option 1: Docker
+   docker run -p 8080:8080 mcp-instana
+   
+   # Option 2: Direct
+   python -m mcp_instana
+   ```
 
----
+2. Get your Instana API key from your Instana instance
 
-### Notion Connection
+**Required Information**:
+- **Server URL**: Your Instana MCP server URL (e.g., `http://localhost:8080/mcp` or your deployed server)
+- **API Key**: Your Instana API key
 
-#### BYOK (API Key)
+**How to Connect**:
+1. Go to Dashboard → MCP Connections → Monitoring
+2. Click **"BYOK"** on Instana
+3. Select **"API Key"**
+4. Enter:
+   - **Server URL**: Your Instana MCP server URL
+   - **API Key**: Your Instana API key
+5. Click **"Connect"**
 
-1. **Get Notion API Key**:
-   - Go to https://www.notion.so/my-integrations
-   - Create new integration
-   - Copy the Internal Integration Token
-   - Note your Workspace ID
-
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Communication
-   - Click **"BYOK"** on Notion
-   - Select **"API Key"**
-   - Enter your API key
-   - Click **"Connect"**
+**Reference**: [Instana MCP Server](https://github.com/instana/mcp-instana)
 
 ---
 
-### Firecrawl Connection
+#### Grafana
+
+**Method**: BYOK (API Key)
+
+**Required Credentials**:
+```json
+{
+  "GRAFANA_API_KEY": "your_api_key",
+  "GRAFANA_URL": "https://your-grafana-instance.com",
+  "GRAFANA_USER": "your_username"
+}
+```
+
+**How to Get**:
+1. Log in to Grafana
+2. Go to Configuration → API Keys
+3. Create new API key
+4. Copy the key
+5. Note your Grafana instance URL
+
+---
+
+#### Sentry
+
+**Method**: BYOK (API Token)
+
+**Required Credentials**:
+```json
+{
+  "SENTRY_API_TOKEN": "your_token",
+  "SENTRY_ORG": "your-org-slug",
+  "SENTRY_PROJECT": "your-project-slug"
+}
+```
+
+**How to Get**:
+1. Go to Sentry → Settings → Auth Tokens
+2. Create new token
+3. Select scopes: `org:read`, `project:read`, `event:read`
+4. Copy the token
+5. Note your Organization slug and Project slug
+
+---
+
+#### DASH0
+
+**Method**: BYOK (API Key)
+
+**Required Credentials**:
+```json
+{
+  "DASH0_API_KEY": "your_api_key"
+}
+```
+
+**How to Get**:
+1. Sign up at DASH0
+2. Go to Dashboard → API Keys
+3. Create API key
+4. Copy the key
+
+---
+
+### 💬 Communication & Documentation
+
+#### Atlassian (JIRA/Confluence)
+
+**Method**: OAuth (Recommended) or BYOK (API Token)
+
+**OAuth Setup**:
+1. Go to https://developer.atlassian.com/console/myapps/
+2. Create a new OAuth 2.0 integration
+3. Set Authorization callback URL: `https://your-domain.com/api/auth/oauth/atlassian/callback`
+4. Note Client ID and Client Secret
+5. Add scopes: `read:jira-work`, `read:confluence-content.all`
+
+**BYOK Setup**:
+1. Go to https://id.atlassian.com/manage-profile/security/api-tokens
+2. Create API token
+3. Copy the token
+4. Note your domain (e.g., `your-domain.atlassian.net`)
+
+---
+
+#### Notion
+
+**Method**: BYOK (API Key)
+
+**How to Get**:
+1. Go to https://www.notion.so/my-integrations
+2. Create new integration
+3. Copy the Internal Integration Token
+4. Note your Workspace ID
+
+---
+
+### 🔍 Analysis & Research
+
+#### Firecrawl
 
 **Note**: This tool is provided by you to facilitate LLM inspection and research capabilities.
 
-#### BYOK (API Key)
+**Method**: BYOK (API Key)
 
-1. **Get Firecrawl API Key**:
-   - Sign up at https://firecrawl.dev
-   - Go to Dashboard → API Keys
-   - Copy your API key
-
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Analysis & Research
-   - Click **"BYOK"** on Firecrawl
-   - Select **"API Key"**
-   - Enter your API key
-   - Click **"Connect"**
+**How to Get**:
+1. Sign up at https://firecrawl.dev
+2. Go to Dashboard → API Keys
+3. Copy your API key
 
 ---
 
-### Perplexity AI Connection
+#### Perplexity AI
 
 **Note**: This tool is provided by you to facilitate LLM inspection and research capabilities.
 
-#### BYOK (API Key)
+**Method**: BYOK (API Key)
 
-1. **Get Perplexity API Key**:
-   - Sign up at https://www.perplexity.ai
-   - Go to Settings → API
-   - Generate API key
-   - Copy the key
-
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Analysis & Research
-   - Click **"BYOK"** on Perplexity AI
-   - Select **"API Key"**
-   - Enter your API key
-   - Click **"Connect"**
+**How to Get**:
+1. Sign up at https://www.perplexity.ai
+2. Go to Settings → API
+3. Generate API key
+4. Copy the key
 
 ---
 
-### Browserbase Connection
+#### Browserbase
 
 **Note**: This tool is provided by you to facilitate LLM inspection and research capabilities.
 
-#### BYOK (API Key)
+**Method**: BYOK (Environment Variables)
 
-1. **Get Browserbase API Key**:
-   - Sign up at https://www.browserbase.com
-   - Go to Dashboard → API Keys
-   - Create API key
-   - Copy the key and Project ID
+**Required Credentials**:
+```json
+{
+  "BROWSERBASE_API_KEY": "your_api_key",
+  "BROWSERBASE_PROJECT_ID": "your_project_id"
+}
+```
 
-2. **Connect via Dashboard**:
-   - Go to Dashboard → MCP Connections → Analysis & Research
-   - Click **"BYOK"** on Browserbase
-   - Select **"Environment Variables"**
-   - Enter JSON:
-     ```json
-     {
-       "BROWSERBASE_API_KEY": "your_api_key",
-       "BROWSERBASE_PROJECT_ID": "your_project_id"
-     }
-     ```
-   - Click **"Connect"**
+**How to Get**:
+1. Sign up at https://www.browserbase.com
+2. Go to Dashboard → API Keys
+3. Create API key
+4. Copy the key and Project ID
 
 ---
 
-## Security Best Practices
+## 🔒 Security Best Practices
 
-1. **Use OAuth when available**: More secure, can be revoked easily
-2. **Rotate credentials regularly**: Especially for API keys/tokens
-3. **Use least privilege**: Grant only necessary permissions
-4. **Never share credentials**: Each user should have their own connections
-5. **Monitor connections**: Regularly review connected services in the dashboard
+### ✅ Do's
 
-## Troubleshooting
+- **Use OAuth when available**: More secure, can be revoked easily
+- **Rotate credentials regularly**: Especially for API keys/tokens
+- **Use least privilege**: Grant only necessary permissions
+- **Never share credentials**: Each user should have their own connections
+- **Monitor connections**: Regularly review connected services in the dashboard
+- **Use environment variables**: For sensitive credentials in production
+
+### ❌ Don'ts
+
+- **Don't commit credentials**: Never commit API keys or tokens to version control
+- **Don't share credentials**: Each user should manage their own connections
+- **Don't use admin credentials**: Create service accounts with minimal permissions
+- **Don't ignore expiration**: Rotate credentials before they expire
+
+---
+
+## 🐛 Troubleshooting
 
 ### Connection Fails
 
-1. **Check credentials**: Ensure API keys/tokens are valid and not expired
-2. **Verify permissions**: Ensure credentials have required scopes/permissions
-3. **Check network**: Ensure your server can reach the service APIs
-4. **Review logs**: Check browser console and server logs for errors
+**Checklist**:
+1. ✅ **Verify credentials**: Ensure API keys/tokens are valid and not expired
+2. ✅ **Check permissions**: Ensure credentials have required scopes/permissions
+3. ✅ **Network access**: Ensure your server can reach the service APIs
+4. ✅ **Review logs**: Check browser console and server logs for errors
+5. ✅ **Test manually**: Try accessing the service API directly with your credentials
 
 ### OAuth Redirect Issues
 
-1. **Verify callback URL**: Must match exactly what's configured in OAuth app
-   - Check that `NEXT_PUBLIC_APP_URL` is set correctly in your `.env` file
-   - Callback URL format: `${NEXT_PUBLIC_APP_URL}/api/auth/oauth/{serverName}/callback`
-   - Example: `http://localhost:3000/api/auth/oauth/github/callback` (local) or `https://your-domain.com/api/auth/oauth/github/callback` (production)
-2. **Check CORS**: Ensure your domain is allowed
-3. **Clear cookies**: Try clearing browser cookies and retry
-4. **Environment variable**: Ensure `NEXT_PUBLIC_APP_URL` matches your actual app URL
+**Common Problems**:
+
+1. **Callback URL mismatch**:
+   - ✅ Verify `NEXT_PUBLIC_APP_URL` is set correctly in your `.env` file
+   - ✅ Callback URL format: `${NEXT_PUBLIC_APP_URL}/api/auth/oauth/{serverName}/callback`
+   - ✅ Example: `https://your-domain.com/api/auth/oauth/github/callback`
+   - ✅ Must match exactly what's configured in OAuth app
+
+2. **CORS errors**:
+   - ✅ Check that your domain is allowed in the OAuth app settings
+   - ✅ Verify CORS headers are configured correctly
+
+3. **Token expiration**:
+   - ✅ Clear browser cookies and retry
+   - ✅ Re-authorize the app
 
 ### BYOK Not Working
 
-1. **Format check**: Ensure JSON is valid for environment variables
-2. **Key names**: Use exact environment variable names as documented
-3. **Special characters**: Escape special characters in JSON properly
+**Common Issues**:
 
-## Need Help?
+1. **Invalid JSON format**:
+   - ✅ Ensure JSON is valid (use a JSON validator)
+   - ✅ Check for trailing commas
+   - ✅ Verify all strings are properly quoted
 
-- Check the [README.md](../README.md) for general setup
-- Review [MCP Integration docs](../mcp/README.md) for technical details
-- Open an issue on GitHub for bugs or feature requests
+2. **Wrong environment variable names**:
+   - ✅ Use exact names as documented (case-sensitive)
+   - ✅ Check service-specific documentation
 
+3. **Special characters**:
+   - ✅ Escape special characters in JSON properly
+   - ✅ Use base64 encoding for complex values if needed
+
+4. **SSE/HTTP server URL**:
+   - ✅ For servers like Instana, ensure the MCP server is running
+   - ✅ Verify the URL is accessible from your server
+   - ✅ Check that the URL includes the `/mcp` endpoint
+
+### Service-Specific Issues
+
+#### AWS
+- **"Config profile (default) could not be found"**:
+  - ✅ Ensure `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_REGION` are set
+  - ✅ Verify credentials are valid and have proper permissions
+
+#### GitHub
+- **"GITHUB_PERSONAL_ACCESS_TOKEN not found"**:
+  - ✅ Ensure token is set in environment variables
+  - ✅ Verify token has required scopes: `repo`, `read:org`
+
+#### Instana
+- **Connection timeout**:
+  - ✅ Verify Instana MCP server is running
+  - ✅ Check that the server URL is correct and accessible
+  - ✅ Ensure API key is valid
+
+---
+
+## 📖 Additional Resources
+
+- [MCP Protocol Documentation](https://modelcontextprotocol.io)
+- [MCP Servers Registry](https://mcpservers.org)
+- [Compliance Copilot README](../README.md)
+- [MCP Integration Technical Docs](../mcp/README.md)
+
+---
+
+## 💡 Need Help?
+
+- **Documentation**: Check the [README.md](../README.md) for general setup
+- **Technical Details**: Review [MCP Integration docs](../mcp/README.md)
+- **Issues**: Open an issue on GitHub for bugs or feature requests
+- **Support**: Contact support for enterprise assistance
+
+---
+
+**Last Updated**: 2025-01-27

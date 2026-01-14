@@ -952,7 +952,7 @@ Return JSON:
         messages: [
           {
             role: 'system',
-            content: 'You are a senior cybersecurity expert creating thorough compliance scan plans. Think like a penetration tester - leave no stone unturned. Be specific about what security issues to find.',
+            content: 'Senior cybersecurity expert creating compliance scan plans. Focus on identifying security vulnerabilities, misconfigurations, and compliance gaps. Be specific about tools and parameters needed.',
           },
           { role: 'user', content: prompt },
         ],
@@ -1353,14 +1353,13 @@ Return JSON:
       PCI: 'Focus on: firewall misconfigurations (Req 1), default credentials (Req 2), cardholder data protection (Req 3-4), access restrictions (Req 7-8), monitoring gaps (Req 10)',
     };
 
-    const prompt = `As a cybersecurity auditor, analyze this ${this.framework} compliance scan result.
+    const prompt = `Analyze ${this.framework} compliance scan result.
 
-Scan Purpose: ${purpose}
+Purpose: ${purpose}
 ${analysisFocus[this.framework] || ''}
 Requirements: ${requirements.slice(0, 8).join(', ')}
 
-Scan Data:
-${dataStr}
+Data: ${dataStr.substring(0, 6000)}
 
 Identify violations:
 1. Critical: Hardcoded secrets, weak/missing encryption, missing auth, SQL injection, insecure APIs, exposed data
@@ -1368,35 +1367,9 @@ Identify violations:
 3. Configuration: Public resources, insecure defaults, missing security headers, weak TLS
 4. Code Quality: Insecure practices, missing validation, error exposure, insecure dependencies
 
-For each violation, provide:
-- Requirement code from ${this.framework}
-- Status: "non-compliant", "partial", or "compliant"
-- Evidence: location (file path, line number, service name), code snippet
-- Severity: "critical", "high", "medium", or "low"
-- Finding description
-- Remediation recommendation
+For each violation: requirement code, status (non-compliant/partial/compliant), evidence (location, code snippet), severity (critical/high/medium/low), finding description, remediation.
 
-Return JSON array (can have multiple results):
-{
-  "results": [
-    {
-      "requirement": "CC6.1",
-      "status": "non-compliant",
-      "evidence": [
-        {
-          "source": "github",
-          "type": "code",
-          "location": "src/config.js:42",
-          "content": "const API_KEY = 'sk_live_1234567890abcdef'",
-          "lineNumber": 42,
-          "severity": "critical",
-          "finding": "Hardcoded production API key found in source code - violates encryption and secret management requirements"
-        }
-      ],
-      "recommendation": "Move API key to environment variables or secret management service (AWS Secrets Manager, HashiCorp Vault)"
-    }
-  ]
-}`;
+Return JSON: {"results": [{"requirement": "CC6.1", "status": "non-compliant", "evidence": [{"source": "github", "type": "code", "location": "src/config.js:42", "content": "...", "lineNumber": 42, "severity": "critical", "finding": "..."}], "recommendation": "..."}]}`;
 
     try {
       const response = await this.openai.chat.completions.create({
@@ -1404,7 +1377,7 @@ Return JSON array (can have multiple results):
         messages: [
           {
             role: 'system',
-            content: `You are a cybersecurity auditor conducting ${this.framework} compliance assessment. Identify security vulnerabilities and compliance violations with specific evidence.`,
+            content: `Cybersecurity auditor conducting ${this.framework} compliance assessment. Identify security vulnerabilities and compliance violations with specific evidence, locations, and severity ratings.`,
           },
           { role: 'user', content: prompt },
         ],
