@@ -13,7 +13,7 @@
 
 **The project is deployed and running live.**
 
-### [👉 Launch Compliance Copilot](https://https://compliance-copilot-project.vercel.app/)
+### [👉 Launch Compliance Copilot](https://compliance-copilot-project.vercel.app/)
 
 ---
 
